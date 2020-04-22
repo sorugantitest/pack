@@ -11,13 +11,15 @@ import (
 	"github.com/Masterminds/semver"
 	"github.com/buildpacks/lifecycle/auth"
 	"github.com/docker/docker/api/types"
-	"github.com/docker/docker/api/types/container"
+	dcontainer "github.com/docker/docker/api/types/container"
 	"github.com/google/go-containerregistry/pkg/authn"
 	"github.com/pkg/errors"
 
 	"github.com/buildpacks/pack/internal/api"
 	"github.com/buildpacks/pack/internal/archive"
+	"github.com/buildpacks/pack/internal/container"
 	"github.com/buildpacks/pack/internal/style"
+	"github.com/buildpacks/pack/logging"
 )
 
 const defaultProcessPlatformAPI = "0.3"
@@ -41,10 +43,10 @@ func (l *Lifecycle) prepareAppVolume(ctx context.Context) error {
 	}
 
 	ctr, err := l.docker.ContainerCreate(ctx,
-		&container.Config{
+		&dcontainer.Config{
 			Entrypoint: []string{entrypoint},
 		},
-		&container.HostConfig{
+		&dcontainer.HostConfig{
 			Binds: []string{fmt.Sprintf("%s:%s", l.AppVolume, l.mountPaths.appDir())},
 		},
 		nil, "",
@@ -54,8 +56,24 @@ func (l *Lifecycle) prepareAppVolume(ctx context.Context) error {
 	}
 	defer l.docker.ContainerRemove(context.Background(), ctr.ID, types.ContainerRemoveOptions{Force: true})
 
+	appReader, err := l.createAppReader()
+	if err != nil {
+		return errors.Wrap(err, "create app reader")
+	}
+
+	err = l.docker.CopyToContainer(ctx, ctr.ID, tarExtractPath, appReader, types.CopyToContainerOptions{})
+	if err != nil {
+		return errors.Wrap(err, "copy app to container")
+	}
+
 	if l.os == "windows" {
-		// run container
+		return container.Run(
+			ctx,
+			l.docker,
+			ctr.ID,
+			logging.NewPrefixWriter(logging.GetWriterForLevel(l.logger, logging.InfoLevel), "PREPARE"),  // TODO: Decide "name"
+			logging.NewPrefixWriter(logging.GetWriterForLevel(l.logger, logging.ErrorLevel), "PREPARE"),
+		)
 	}
 	return nil
 }

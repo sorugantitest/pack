@@ -17,11 +17,6 @@ func (d *DefaultPhaseFactory) New(provider *PhaseConfigProvider) RunnerCleaner {
 		logger:     d.lifecycle.logger,
 		uid:        d.lifecycle.builder.UID(),
 		gid:        d.lifecycle.builder.GID(),
-		appPath:    d.lifecycle.appPath,
-		mountPaths: d.lifecycle.mountPaths,
-		appOnce:    d.lifecycle.appOnce,
 		fileFilter: d.lifecycle.fileFilter,
-		os:         provider.os,
-		appVolume:  d.lifecycle.AppVolume,
 	}
 }
