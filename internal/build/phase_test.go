@@ -128,28 +128,30 @@ func testPhase(t *testing.T, when spec.G, it spec.S) {
 				h.AssertContains(t, outBuf.String(), "[phase] file contents: test-app")
 			})
 
-			it("copies the app into the app volume before the first phase", func() {
-				configProvider := build.NewPhaseConfigProvider(phaseName, lifecycle, build.WithArgs("read", "/workspace/fake-app-file"))
-				readPhase := phaseFactory.New(configProvider)
-				assertRunSucceeds(t, readPhase, &outBuf, &errBuf)
-				h.AssertContains(t, outBuf.String(), "[phase] file contents: fake-app-contents")
-				h.AssertContains(t, outBuf.String(), "[phase] file uid/gid: 111/222")
-
-				configProvider = build.NewPhaseConfigProvider(phaseName, lifecycle, build.WithArgs("delete", "/workspace/fake-app-file"))
-				deletePhase := phaseFactory.New(configProvider)
-				assertRunSucceeds(t, deletePhase, &outBuf, &errBuf)
-				h.AssertContains(t, outBuf.String(), "[phase] delete test")
-
-				configProvider = build.NewPhaseConfigProvider(phaseName, lifecycle, build.WithArgs("read", "/workspace/fake-app-file"))
-				readPhase2 := phaseFactory.New(configProvider)
-				err := readPhase2.Run(context.TODO())
-				readPhase2.Cleanup()
-				h.AssertNotNil(t, err)
-				h.AssertContains(t, outBuf.String(), "failed to read file")
-			})
+			// it("copies the app into the app volume before the first phase", func() {
+			// 	configProvider := build.NewPhaseConfigProvider(phaseName, lifecycle, build.WithArgs("read", "/workspace/fake-app-file"))
+			// 	readPhase := phaseFactory.New(configProvider)
+			// 	assertRunSucceeds(t, readPhase, &outBuf, &errBuf)
+			// 	h.AssertContains(t, outBuf.String(), "[phase] file contents: fake-app-contents")
+			// 	h.AssertContains(t, outBuf.String(), "[phase] file uid/gid: 111/222")
+			//
+			// 	configProvider = build.NewPhaseConfigProvider(phaseName, lifecycle, build.WithArgs("delete", "/workspace/fake-app-file"))
+			// 	deletePhase := phaseFactory.New(configProvider)
+			// 	assertRunSucceeds(t, deletePhase, &outBuf, &errBuf)
+			// 	h.AssertContains(t, outBuf.String(), "[phase] delete test")
+			//
+			// 	configProvider = build.NewPhaseConfigProvider(phaseName, lifecycle, build.WithArgs("read", "/workspace/fake-app-file"))
+			// 	readPhase2 := phaseFactory.New(configProvider)
+			// 	err := readPhase2.Run(context.TODO())
+			// 	readPhase2.Cleanup()
+			// 	h.AssertNotNil(t, err)
+			// 	h.AssertContains(t, outBuf.String(), "failed to read file")
+			// })
 
 			when("app is a dir", func() {
 				it("preserves original mod times", func() {
+					h.AssertNil(t, lifecycle.PrepareAppVolume(context.TODO()))
+
 					assertAppModTimePreserved(t, lifecycle, phaseFactory, &outBuf, &errBuf)
 				})
 			})
@@ -159,6 +161,7 @@ func testPhase(t *testing.T, when spec.G, it spec.S) {
 					var err error
 					lifecycle, err = CreateFakeLifecycle(docker, logger, filepath.Join("testdata", "fake-app.zip"), repoName)
 					h.AssertNil(t, err)
+					h.AssertNil(t, lifecycle.PrepareAppVolume(context.TODO()))
 					phaseFactory = build.NewDefaultPhaseFactory(lifecycle)
 
 					assertAppModTimePreserved(t, lifecycle, phaseFactory, &outBuf, &errBuf)
@@ -195,6 +198,7 @@ func testPhase(t *testing.T, when spec.G, it spec.S) {
 						logger := ilogging.NewLogWithWriters(&outBuf, &outBuf)
 						lifecycle, err = CreateFakeLifecycle(docker, logger, tmpFakeAppDir, repoName)
 						h.AssertNil(t, err)
+						h.AssertNil(t, lifecycle.PrepareAppVolume(context.TODO()))
 						phaseFactory = build.NewDefaultPhaseFactory(lifecycle)
 
 						configProvider := build.NewPhaseConfigProvider(phaseName, lifecycle, build.WithArgs("read", "/workspace/fake-app-file"))

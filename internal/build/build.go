@@ -137,8 +137,7 @@ func (l *Lifecycle) Execute(ctx context.Context, opts LifecycleOptions) error {
 
 	phaseFactory := NewDefaultPhaseFactory(l)
 
-	l.logger.Info(style.Step("PREPARING"))
-	if err := l.prepareAppVolume(ctx); err != nil {
+	if err := l.PrepareAppVolume(ctx); err != nil {
 		return err
 	}
 

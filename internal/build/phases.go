@@ -33,18 +33,24 @@ type PhaseFactory interface {
 	New(provider *PhaseConfigProvider) RunnerCleaner
 }
 
-// TODO: Test this
-func (l *Lifecycle) prepareAppVolume(ctx context.Context) error {
+func (l *Lifecycle) PrepareAppVolume(ctx context.Context) error {
 	tarExtractPath := "/"
-	entrypoint := ""
+	cmd := []string{""}
 	if l.os == "windows" {
 		tarExtractPath = "/windows"
-		entrypoint = fmt.Sprintf(`xcopy c:%s\%s %s /E /H /Y /C /B &&`, style.Symbol(l.mountPaths.appDir()), strings.ReplaceAll(tarExtractPath, "/", `\`), l.mountPaths.appDirName(), l.mountPaths.appDir())
+		cmd = []string{
+			"xcopy",
+			fmt.Sprintf(`c:%s\%s`, strings.ReplaceAll(tarExtractPath, "/", `\`), l.mountPaths.appDirName()),
+			l.mountPaths.appDir(),
+			"/e", "/h", "/y", "/c", "/b",
+		}
 	}
 
 	ctr, err := l.docker.ContainerCreate(ctx,
 		&dcontainer.Config{
-			Entrypoint: []string{entrypoint},
+			Image:      l.builder.Name(),
+			Cmd:        cmd,
+			WorkingDir: "/",
 		},
 		&dcontainer.HostConfig{
 			Binds: []string{fmt.Sprintf("%s:%s", l.AppVolume, l.mountPaths.appDir())},
@@ -58,8 +64,9 @@ func (l *Lifecycle) prepareAppVolume(ctx context.Context) error {
 
 	appReader, err := l.createAppReader()
 	if err != nil {
-		return errors.Wrap(err, "create app reader")
+		return errors.Wrapf(err, "create tar archive from '%s'", l.appPath)
 	}
+	defer appReader.Close()
 
 	err = l.docker.CopyToContainer(ctx, ctr.ID, tarExtractPath, appReader, types.CopyToContainerOptions{})
 	if err != nil {
@@ -67,12 +74,13 @@ func (l *Lifecycle) prepareAppVolume(ctx context.Context) error {
 	}
 
 	if l.os == "windows" {
+		l.logger.Debugf("Running container to populate app volume from %s", style.Symbol(l.appPath))
 		return container.Run(
 			ctx,
 			l.docker,
 			ctr.ID,
-			logging.NewPrefixWriter(logging.GetWriterForLevel(l.logger, logging.InfoLevel), "PREPARE"),  // TODO: Decide "name"
-			logging.NewPrefixWriter(logging.GetWriterForLevel(l.logger, logging.ErrorLevel), "PREPARE"),
+			logging.GetWriterForLevel(l.logger, logging.DebugLevel),
+			logging.GetWriterForLevel(l.logger, logging.ErrorLevel),
 		)
 	}
 	return nil
@@ -94,21 +102,6 @@ func (l *Lifecycle) createAppReader() (io.ReadCloser, error) {
 	}
 
 	return archive.ReadZipAsTar(l.appPath, "/"+l.mountPaths.appDirName(), l.builder.UID(), l.builder.GID(), -1, false, l.fileFilter), nil
-}
-
-func (l *Lifecycle) copyAppToContainer(ctx context.Context, container, path string) error {
-	appReader, err := l.createAppReader()
-	if err != nil {
-		return errors.Wrapf(err, "create tar archive from '%s'", l.appPath)
-	}
-	defer appReader.Close()
-
-	err = l.docker.CopyToContainer(ctx, container, path, appReader, types.CopyToContainerOptions{})
-	if err != nil {
-		return errors.Wrapf(err, "failed to copy app directory")
-	}
-
-	return nil
 }
 
 func (l *Lifecycle) Detect(ctx context.Context, networkMode string, volumes []string, phaseFactory PhaseFactory) error {

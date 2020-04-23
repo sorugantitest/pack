@@ -9,10 +9,10 @@ import (
 type PhaseConfigProviderOperation func(*PhaseConfigProvider)
 
 type PhaseConfigProvider struct {
-	ctrConf    *container.Config
-	hostConf   *container.HostConfig
-	name       string
-	os         string
+	ctrConf  *container.Config
+	hostConf *container.HostConfig
+	name     string
+	os       string
 }
 
 func NewPhaseConfigProvider(name string, lifecycle *Lifecycle, ops ...PhaseConfigProviderOperation) *PhaseConfigProvider {
@@ -68,11 +68,11 @@ func WithBinds(binds ...string) PhaseConfigProviderOperation {
 
 func WithDaemonAccess() PhaseConfigProviderOperation {
 	return func(provider *PhaseConfigProvider) {
-		bind := "/var/run/docker.sock:/var/run/docker.sock"
-		if provider.os == "windows" {
-			bind = `\\.\pipe\docker_engine:\\.\pipe\docker_engine`
+		bind := `\\.\pipe\docker_engine:\\.\pipe\docker_engine`
+		if provider.os != "windows" {
+			bind = "/var/run/docker.sock:/var/run/docker.sock"
+			WithRoot()(provider)
 		}
-		WithRoot()(provider)
 		provider.hostConf.Binds = append(provider.hostConf.Binds, bind)
 	}
 }
@@ -105,8 +105,10 @@ func WithNetwork(networkMode string) PhaseConfigProviderOperation {
 func WithRegistryAccess(authConfig string) PhaseConfigProviderOperation {
 	return func(provider *PhaseConfigProvider) {
 		provider.ctrConf.Env = append(provider.ctrConf.Env, fmt.Sprintf(`CNB_REGISTRY_AUTH=%s`, authConfig))
-		// TODO: Find windows equivalent
-		provider.hostConf.NetworkMode = container.NetworkMode("host")
+
+		if provider.os != "windows" {
+			provider.hostConf.NetworkMode = "host"
+		}
 	}
 }
 
