@@ -186,7 +186,7 @@ func testPhase(t *testing.T, when spec.G, it spec.S) {
 						tmpFakeAppDir, err = ioutil.TempDir("", "fake-app")
 						h.AssertNil(t, err)
 						dirWithoutAccess = filepath.Join(tmpFakeAppDir, "bad-dir")
-						err := os.MkdirAll(dirWithoutAccess, 0222)
+						err := os.MkdirAll(dirWithoutAccess, 0777)//0222)
 						h.AssertNil(t, err)
 					})
 
@@ -194,11 +194,12 @@ func testPhase(t *testing.T, when spec.G, it spec.S) {
 						h.AssertNil(t, os.RemoveAll(tmpFakeAppDir))
 					})
 
-					it("returns an error", func() {
+					it.Focus("returns an error", func() {
 						logger := ilogging.NewLogWithWriters(&outBuf, &outBuf)
 						lifecycle, err = CreateFakeLifecycle(docker, logger, tmpFakeAppDir, repoName)
 						h.AssertNil(t, err)
-						h.AssertNil(t, lifecycle.PrepareAppVolume(context.TODO()))
+						err2 := lifecycle.PrepareAppVolume(context.TODO())
+						h.AssertNil(t, err2)
 						phaseFactory = build.NewDefaultPhaseFactory(lifecycle)
 
 						configProvider := build.NewPhaseConfigProvider(phaseName, lifecycle, build.WithArgs("read", "/workspace/fake-app-file"))
