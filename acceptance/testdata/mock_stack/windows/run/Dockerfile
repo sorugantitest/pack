@@ -12,3 +12,4 @@ LABEL io.buildpacks.stack.id=pack.test.stack
 LABEL io.buildpacks.stack.mixins="[\"mixinA\", \"netcat\", \"mixin3\"]"
 
 USER pack
+
